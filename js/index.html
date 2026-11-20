@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Optimal Master Track Placement</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #222; --muted: #6b6b6b; --panel: #f5f5f5; --border: #dcdcdc;
+    --accent: #2c6fb7; --err: #b3261e; --warn-bg: #fff4d6; --err-bg: #fde7e7; --row-alt: #fafafa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17191c; --fg: #e6e6e6; --muted: #a0a0a0; --panel: #23262a; --border: #3a3e44;
+      --accent: #6aa6ee; --err: #ff8a80; --warn-bg: #4a3d12; --err-bg: #4a1f1f; --row-alt: #1d2024;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17191c; --fg: #e6e6e6; --muted: #a0a0a0; --panel: #23262a; --border: #3a3e44;
+    --accent: #6aa6ee; --err: #ff8a80; --warn-bg: #4a3d12; --err-bg: #4a1f1f; --row-alt: #1d2024;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  h1 { font-size: 26px; font-weight: 500; margin: 14px 16px; }
+  h3 { font-size: 19px; font-weight: 500; margin: 4px 0 10px; }
+  h4 { font-size: 16px; font-weight: 500; margin: 14px 0 6px; }
+  .layout { display: flex; gap: 18px; padding: 0 16px 24px; align-items: flex-start; }
+  .sidebar { flex: 0 0 320px; background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 14px; }
+  .main { flex: 1 1 auto; min-width: 0; }
+  @media (max-width: 820px) { .layout { flex-direction: column; } .sidebar { flex: none; width: 100%; } }
+  label.ctl { display: block; font-weight: 600; margin: 10px 0 4px; }
+  input[type=number], input[type=text], select { width: 100%; padding: 5px 7px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--fg); font: inherit; }
+  select[multiple] { min-height: 80px; }
+  input[type=file] { width: 100%; font-size: 13px; }
+  input[type=range] { width: 100%; }
+  .check { font-weight: normal; display: flex; gap: 6px; align-items: center; margin: 4px 0; }
+  .note { font-size: 12px; color: var(--muted); margin: 4px 0; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 14px 0; }
+  details.adv summary { cursor: pointer; font-weight: 600; margin-top: 8px; }
+  .info-i { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 11px; text-align: center; line-height: 16px; cursor: help; font-weight: 700; }
+  .tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+  .tabs button { background: none; border: 1px solid transparent; border-bottom: none; padding: 8px 13px; cursor: pointer; color: var(--accent); font: inherit; border-radius: 4px 4px 0 0; margin-bottom: -1px; }
+  .tabs button.active { color: var(--fg); border-color: var(--border); background: var(--bg); }
+  .tabpane { display: none; padding-top: 10px; }
+  .tabpane.active { display: block; }
+  .tbl-ctl { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin: 6px 0; }
+  .tbl-ctl select { width: auto; } .tbl-ctl input { width: 180px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 3px; background: var(--bg); color: var(--fg); }
+  .tbl-scroll { overflow-x: auto; }
+  table.data { border-collapse: collapse; width: 100%; font-size: 13px; }
+  table.data th, table.data td { border-bottom: 1px solid var(--border); padding: 5px 8px; text-align: left; white-space: nowrap; }
+  table.data th { cursor: pointer; user-select: none; border-bottom: 2px solid var(--border); }
+  table.data tbody tr:nth-child(odd) { background: var(--row-alt); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbl-info { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 6px 0; color: var(--muted); font-size: 12px; }
+  .tbl-info button { font-size: 12px; }
+  button.dl { padding: 6px 12px; border: 1px solid var(--border); background: var(--panel); color: var(--fg); border-radius: 3px; cursor: pointer; font: inherit; }
+  button.dl:disabled { opacity: .5; cursor: default; }
+  .charts { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chartbox { flex: 1 1 340px; height: 340px; position: relative; min-width: 0; }
+  .adm { float: left; padding: 5px; min-width: 160px; }
+  .adm h6 { font-size: 13px; margin: 6px 0 2px; }
+  .adm ol { margin: 0; padding-left: 22px; font-size: 13px; }
+  .clear { clear: both; }
+  .err { color: var(--err); }
+  .muted { color: var(--muted); }
+  .disclaimer { font-style: italic; color: var(--muted); }
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 6px; z-index: 10; max-width: min(380px, calc(100vw - 32px)); }
+  .toast { background: var(--panel); border: 1px solid var(--border); border-radius: 4px; padding: 8px 28px 8px 10px; position: relative; box-shadow: 0 2px 6px rgba(0,0,0,.15); font-size: 13px; }
+  .toast.warning { background: var(--warn-bg); } .toast.error { background: var(--err-bg); }
+  .toast-x { position: absolute; right: 4px; top: 2px; border: 0; background: none; color: var(--fg); cursor: pointer; font-size: 16px; }
+</style>
+</head>
+<body>
+<h1>Optimal Master Track Placement</h1>
+<div class="layout">
+  <aside class="sidebar">
+    <h3>Track placement</h3>
+    <label class="ctl" for="iseed">Number to use as shuffling seed.</label>
+    <input type="number" id="iseed" min="0" step="1" value="20180228">
+
+    <label class="ctl" for="file1">Upload Student Applications (xls/csv)</label>
+    <input type="file" id="file1" accept="text/csv,text/comma-separated-values,text/plain,.csv,.xlsx,.xls">
+    <label class="check"><input type="checkbox" id="header1" checked> Header</label>
+    <p class="note">For Excel files the first row is always used as header (as in the original app).</p>
+
+    <label class="ctl" for="student">StudentID</label><select id="student"><option value="">(none)</option></select>
+    <label class="ctl" for="track">Track</label><select id="track"><option value="">(none)</option></select>
+    <label class="ctl" for="preference">Preference</label><select id="preference"><option value="">(none)</option></select>
+    <label class="ctl" for="qualification">Qualification</label><select id="qualification"><option value="">(none)</option></select>
+    <label class="ctl" for="qlevels">Qualification levels</label>
+    <input type="text" id="qlevels" value="E, V, O">
+    <p class="note"><b>Note:</b> Order levels top to bottom, separated by commas. Ignored if Qualification column is quantitative. The last level is interpreted as 'unqualified' and causes the corresponding preference to be ignored.
+      (All columns are read as text, exactly as in the original app, so in practice the levels are always used.)</p>
+    <label class="ctl" for="remove_cols">Ignore columns</label>
+    <select id="remove_cols" multiple></select>
+    <p class="note">Ctrl/Cmd-click to select several.</p>
+    <hr>
+    <label class="ctl" for="file3">Upload Master Track Quota (xls/csv)</label>
+    <input type="file" id="file3" accept="text/csv,text/comma-separated-values,text/plain,.csv,.xlsx,.xls">
+    <label class="check"><input type="checkbox" id="header3" checked> Header</label>
+    <p class="note">Track quota: Columns correspond to Track IDs, row 1 contains track quota.</p>
+    <hr>
+    <h3>Waiting list</h3>
+    <label class="ctl" for="withdrawrate">Percentage withdrawal: <span id="withdrawrate_val">10</span></label>
+    <input type="range" id="withdrawrate" min="0.5" max="30" step="0.5" value="10">
+    <p class="note">Percentage of expected withdrawals after acceptance. Used in waitlist computations.</p>
+    <details class="adv">
+      <summary>Reproducibility (R compatibility)</summary>
+      <label class="ctl" for="samplekind">R sample.kind
+        <span class="info-i" title="How R's sample() turns uniform random numbers into integers.&#10;&#10;Rejection: default since R 3.6.0 (bit-wise rejection sampling, unbiased). Use this to reproduce a placement computed with a current R.&#10;&#10;Rounding: R before 3.6.0, floor(n * unif_rand()). The original app was deployed in 2018 on R 3.4, so use 'Rounding' to reproduce lotteries from that deployment (equivalent to RNGkind(sample.kind = &quot;Rounding&quot;) in R &gt;= 3.6).&#10;&#10;Both use the Mersenne-Twister generator seeded with set.seed(seed).">i</span></label>
+      <select id="samplekind">
+        <option value="Rejection" selected>Rejection (R &gt;= 3.6.0, default)</option>
+        <option value="Rounding">Rounding (R &lt; 3.6.0, e.g. 2018 deployment)</option>
+      </select>
+      <label class="ctl" for="collation">String collation for sort()
+        <span class="info-i" title="tidyr::spread() orders students and tracks with base R sort(), which depends on the collation locale of the R session. 'locale' = ICU/en-US collation (an R session in en_US.UTF-8, the usual server setting); 'C' = code-point order (an R session with LC_COLLATE=C). The order affects which random number goes to which student, and the order of tracks/students in the tables.">i</span></label>
+      <select id="collation">
+        <option value="locale" selected>locale (en_US.UTF-8)</option>
+        <option value="C">C</option>
+      </select>
+    </details>
+  </aside>
+
+  <main class="main">
+    <nav class="tabs">
+      <button class="active" data-tab="tab-imported">Imported Student Applications</button>
+      <button data-tab="tab-result">Result</button>
+      <button data-tab="tab-summary">Summary</button>
+      <button data-tab="tab-details">Details</button>
+      <button data-tab="tab-waitlist">Waiting list</button>
+    </nav>
+    <section class="tabpane active" id="tab-imported">
+      <h4>Quotas</h4><div id="contents3"></div>
+      <h4>Applications</h4><div id="contents0"></div>
+    </section>
+    <section class="tabpane" id="tab-result">
+      <p><button class="dl" id="downloadData">&#x2B07; Download</button></p>
+      <hr>
+      <div id="myText"></div>
+    </section>
+    <section class="tabpane" id="tab-summary">
+      <div class="charts">
+        <div class="chartbox"><canvas id="summary"></canvas></div>
+        <div class="chartbox"><canvas id="summary2"></canvas></div>
+      </div>
+      <div id="collegeAdmissions"></div>
+      <div class="clear"></div>
+    </section>
+    <section class="tabpane" id="tab-details">
+      <div id="details"></div>
+    </section>
+    <section class="tabpane" id="tab-waitlist">
+      <h4>Waiting list</h4>
+      <p>Numbers under college names give indication of chance (%) that a student will be accepted in the college after the expected number of placed students have decided to withdraw.</p>
+      <p class="disclaimer">Disclaimer: These probabilities are estimated from a limited set of simulations and hence may vary from one use of this program to the next. The simulations make a very simplistic assumption that student withdrawal is uniform across Tracks and independent from their initial placement. Simulations take some time; please be patient.</p>
+      <div id="waitlist"></div>
+    </section>
+  </main>
+</div>
+<div id="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>
