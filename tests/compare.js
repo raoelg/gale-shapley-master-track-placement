@@ -2,7 +2,7 @@
 // usage: node compare.js [casesDir] [collation=locale|C]
 const fs = require('fs'), path = require('path');
 const XLSX = require('xlsx');
-const OMTP = require('./app.js');
+const OMTP = require('../docs/app.js');
 const casesDir = process.argv[2] || path.join(__dirname, 'cases');
 const collation = process.argv[3] || 'locale';
 
